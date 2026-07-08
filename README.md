@@ -22,6 +22,45 @@ const instance = fetchUser.perform(1);
 const user = await instance;
 ```
 
+## Two Interfaces
+
+### Chaining methods
+
+```ts
+const t = task(async (id: number) => {
+  const res = await fetch(`/users/${id}`);
+  return res.json();
+}).restartable().maxConcurrency(3);
+```
+
+Chaining can be done at any point — calling a second time is a no-op. Replacing a policy mid-flight (e.g. `.drop()` after `.restartable()`) rebuilds the scheduler; any in-flight instances are orphaned.
+
+### Constructor options
+
+```ts
+const t = task(async (id: number) => {
+  const res = await fetch(`/users/${id}`);
+  return res.json();
+}, { restartable: true, maxConcurrency: 3 });
+```
+
+Options are applied once during construction. Only one concurrency modifier can be set — the `else if` chain means `{ restartable: true, enqueue: true }` silently ignores `enqueue`.
+
+### Helper functions
+
+`timeout`, `all`, and `race` are standalone functions that auto-detect the enclosing task via the context stack. They auto-cancel when the task is canceled, unlike `Promise.all` / `Promise.race`:
+
+```ts
+const t = task(async () => {
+  const [a, b] = await all([fetchA(), fetchB()]);
+  return a + b;
+});
+```
+
+If this task is canceled mid-flight, `all` rejects immediately and `fetchB` is never awaited — no I/O leak.
+
+Outside a task context, `all` and `race` behave identically to `Promise.all` / `Promise.race`. `timeout` resolves after the given delay.
+
 ## Concurrency Modifiers
 
 ### `restartable`
@@ -92,8 +131,6 @@ const process = task(async (item: number) => {
 ```
 
 ## Concurrency Helpers
-
-`timeout`, `all`, and `race` auto-cancel when their enclosing task is canceled.
 
 ### `timeout`
 
