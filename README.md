@@ -180,15 +180,4 @@ task(async () => { ... }).onState((state) => {
 });
 ```
 
-## API
 
-### `task(fn, options?)`
-### `restartableTask(fn, options?)`
-### `dropTask(fn, options?)`
-### `enqueueTask(fn, options?)`
-### `keepLatestTask(fn, options?)`
-### `timeout(ms)`
-### `all(values)`
-### `race(values)`
-### `TaskCancelation`
-### `isTaskCancelation(error)`
