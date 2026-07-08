@@ -163,15 +163,6 @@ t.lastErrored
 t.lastCanceled
 ```
 
-## Factory Functions
-
-```ts
-import { restartableTask, dropTask, enqueueTask, keepLatestTask } from "task-concurrency";
-
-const t = restartableTask(async () => { ... });
-// equivalent to: task(...).restartable()
-```
-
 ## onState Callback
 
 ```ts

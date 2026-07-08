@@ -2,10 +2,6 @@ import { describe, test, expect } from 'bun:test';
 
 import {
   task,
-  restartableTask,
-  dropTask,
-  enqueueTask,
-  keepLatestTask,
   timeout,
   all,
   race,
@@ -361,53 +357,6 @@ describe('onState callback', () => {
 
     await t.perform();
     expect(callCount).toBe(1);
-  });
-});
-
-describe('Factory functions', () => {
-  test('restartableTask creates restartable task', async () => {
-    const t = restartableTask(async () => {
-      await timeout(50);
-      return 1;
-    });
-    const instance = t.perform();
-    await timeout(10);
-    const instance2 = t.perform();
-    expect(instance.isCanceled).toBe(true);
-    expect(instance2.isRunning).toBe(true);
-  });
-
-  test('dropTask creates drop task', () => {
-    const t = dropTask(async () => 1);
-    const instance = t.perform();
-    const instance2 = t.perform();
-    expect(instance2.isCanceled).toBe(true);
-    expect(instance.isRunning).toBe(true);
-  });
-
-  test('enqueueTask creates enqueue task', async () => {
-    const t = enqueueTask(async (x: number) => {
-      await timeout(30);
-      return x;
-    });
-
-    const [a, b] = await Promise.all([t.perform(1), t.perform(2)]);
-    expect(a).toBe(1);
-    expect(b).toBe(2);
-  });
-
-  test('keepLatestTask creates keepLatest task', async () => {
-    const t = keepLatestTask(async (x: string) => {
-      await timeout(30);
-      return x;
-    });
-
-    const a = t.perform('a');
-    await timeout(5);
-    const b = t.perform('b');
-    await timeout(100);
-    expect(a.isCanceled || a.isSuccessful).toBe(true);
-    expect(b.isSuccessful).toBe(true);
   });
 });
 

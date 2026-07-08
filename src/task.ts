@@ -301,30 +301,4 @@ export function task<T, Args extends unknown[]>(
 	return new Task<T, Args>(fn, options);
 }
 
-export function restartableTask<T, Args extends unknown[]>(
-	fn: (...args: Args) => Promise<T>,
-	options?: TaskOptions,
-): Task<T, Args> {
-	return new Task<T, Args>(fn, { ...options, restartable: true });
-}
 
-export function dropTask<T, Args extends unknown[]>(
-	fn: (...args: Args) => Promise<T>,
-	options?: TaskOptions,
-): Task<T, Args> {
-	return new Task<T, Args>(fn, { ...options, drop: true });
-}
-
-export function enqueueTask<T, Args extends unknown[]>(
-	fn: (...args: Args) => Promise<T>,
-	options?: TaskOptions,
-): Task<T, Args> {
-	return new Task<T, Args>(fn, { ...options, enqueue: true });
-}
-
-export function keepLatestTask<T, Args extends unknown[]>(
-	fn: (...args: Args) => Promise<T>,
-	options?: TaskOptions,
-): Task<T, Args> {
-	return new Task<T, Args>(fn, { ...options, keepLatest: true });
-}
