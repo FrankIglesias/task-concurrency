@@ -25,14 +25,6 @@ export interface TaskDerivedState {
 	lastIncomplete: TaskInstance<unknown> | null;
 }
 
-export interface TaskOptions {
-	restartable?: boolean;
-	enqueue?: boolean;
-	drop?: boolean;
-	keepLatest?: boolean;
-	maxConcurrency?: number;
-}
-
 type PolicyConstructor = new (
 	maxConcurrency?: number | null,
 ) => SchedulerPolicy;
@@ -60,25 +52,7 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 
 	constructor(
 		private _fn: (...args: Args) => Promise<T>,
-		options?: TaskOptions,
-	) {
-		if (options) {
-			this._applyOptions(options);
-		}
-	}
-
-	private _applyOptions(options: TaskOptions): void {
-		if (options.restartable) this._policyCtor = RestartableSchedulerPolicy;
-		else if (options.enqueue) this._policyCtor = EnqueueSchedulerPolicy;
-		else if (options.drop) this._policyCtor = DropSchedulerPolicy;
-		else if (options.keepLatest) this._policyCtor = KeepLatestSchedulerPolicy;
-
-		if (options.maxConcurrency !== undefined) {
-			this._maxConcurrency = options.maxConcurrency;
-		}
-
-		this._rebuildScheduler();
-	}
+	) {}
 
 	private _rebuildScheduler(): void {
 		const policy = new this._policyCtor(this._maxConcurrency);
@@ -296,9 +270,8 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 
 export function task<T, Args extends unknown[]>(
 	fn: (...args: Args) => Promise<T>,
-	options?: TaskOptions,
 ): Task<T, Args> {
-	return new Task<T, Args>(fn, options);
+	return new Task<T, Args>(fn);
 }
 
 

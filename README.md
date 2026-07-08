@@ -33,18 +33,7 @@ const t = task(async (id: number) => {
 }).restartable().maxConcurrency(3);
 ```
 
-Chaining can be done at any point — calling a second time is a no-op. Replacing a policy mid-flight (e.g. `.drop()` after `.restartable()`) rebuilds the scheduler; any in-flight instances are orphaned.
-
-### Constructor options
-
-```ts
-const t = task(async (id: number) => {
-  const res = await fetch(`/users/${id}`);
-  return res.json();
-}, { restartable: true, maxConcurrency: 3 });
-```
-
-Options are applied once during construction. Only one concurrency modifier can be set — the `else if` chain means `{ restartable: true, enqueue: true }` silently ignores `enqueue`.
+Calling a policy method a second time is a no-op. Replacing a policy mid-flight (e.g. `.drop()` after `.restartable()`) rebuilds the scheduler; any in-flight instances are orphaned.
 
 ### Helper functions
 

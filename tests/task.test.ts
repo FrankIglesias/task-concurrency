@@ -529,7 +529,7 @@ describe('Task with options', () => {
     const t = task(async () => {
       await timeout(50);
       return 1;
-    }, { restartable: true });
+    }).restartable();
     expect(t.isIdle).toBe(true);
 
     const first = t.perform();
@@ -537,80 +537,6 @@ describe('Task with options', () => {
     const second = t.perform();
     expect(first.isCanceled).toBe(true);
     expect(second.isRunning).toBe(true);
-  });
-
-  test('constructor with drop option', async () => {
-    let count = 0;
-    const t = task(async () => {
-      count++;
-      await timeout(50);
-    }, { drop: true });
-
-    const a = t.perform();
-    const b = t.perform();
-    await timeout(100);
-    expect(count).toBe(1);
-    expect(b.isCanceled).toBe(true);
-  });
-
-  test('constructor with enqueue option', async () => {
-    const order: string[] = [];
-    const t = task(async (id: string) => {
-      order.push(`start-${id}`);
-      await timeout(30);
-      order.push(`end-${id}`);
-    }, { enqueue: true });
-
-    await Promise.all([t.perform('a'), t.perform('b')]);
-    expect(order).toEqual(['start-a', 'end-a', 'start-b', 'end-b']);
-  });
-
-  test('constructor with keepLatest option', async () => {
-    const t = task(async (v: string) => {
-      await timeout(50);
-      return v;
-    }, { keepLatest: true });
-
-    const a = t.perform('a');
-    await timeout(5);
-    const b = t.perform('b');
-    await timeout(100);
-    expect(b.isSuccessful).toBe(true);
-  });
-
-  test('constructor with maxConcurrency only', async () => {
-    let current = 0;
-    let max = 0;
-    const t = task(async (id: number) => {
-      current++;
-      await timeout(30);
-      max = Math.max(max, current);
-      await timeout(30);
-      current--;
-      return id;
-    }, { maxConcurrency: 2 });
-
-    const instances = await Promise.all([t.perform(1), t.perform(2), t.perform(3)]);
-    expect(instances).toEqual([1, 2, 3]);
-    expect(max).toBe(2);
-  });
-
-  test('constructor with restartable and maxConcurrency', async () => {
-    let count = 0;
-    const t = task(async () => {
-      count++;
-      await timeout(50);
-    }, { restartable: true, maxConcurrency: 2 });
-
-    const a = t.perform();
-    const b = t.perform();
-    await timeout(10);
-    const c = t.perform();
-    await timeout(100);
-    expect(a.isCanceled || a.isSuccessful).toBe(true);
-    expect(b.isCanceled || b.isSuccessful).toBe(true);
-    expect(c.isSuccessful).toBe(true);
-    expect(count).toBeLessThanOrEqual(3);
   });
 });
 
