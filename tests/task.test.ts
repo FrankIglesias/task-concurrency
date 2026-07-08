@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 
+import { getCurrentTaskInstance } from '../src/context.ts';
 import {
   task,
   timeout,
@@ -112,6 +113,48 @@ describe('TaskInstance', () => {
     expect(a).toBe(1);
     expect(b).toBe(2);
   });
+
+  test('state getter returns correct state', async () => {
+    const t = task(async () => {
+      await timeout(10);
+      return 'ok';
+    });
+
+    const instance = t.perform();
+    expect(instance.state).toBe('running');
+    await instance;
+    expect(instance.state).toBe('completed');
+  });
+
+  test('signal is an AbortSignal', async () => {
+    const t = task(async () => 42);
+    const instance = t.perform();
+    expect(instance.signal).toBeInstanceOf(AbortSignal);
+    expect(instance.signal.aborted).toBe(false);
+    instance.cancel();
+    expect(instance.signal.aborted).toBe(true);
+  });
+
+  test('value is set on completion', async () => {
+    const t = task(async (x: number) => {
+      await timeout(10);
+      return x * 2;
+    });
+    const instance = t.perform(5);
+    expect(instance.value).toBeUndefined();
+    await instance;
+    expect(instance.value).toBe(10);
+  });
+
+  test('catch() catches rejection', async () => {
+    const t = task(async () => {
+      throw new Error('instance-error');
+    });
+    const instance = t.perform();
+    let caught: unknown = undefined;
+    await instance.catch((e) => { caught = e; });
+    expect((caught as Error).message).toBe('instance-error');
+  });
 });
 
 describe('Task state properties', () => {
@@ -189,6 +232,72 @@ describe('Task state properties', () => {
     instance.cancel();
     await expectRejects(instance);
     expect(t.lastCanceled).toBe(instance);
+  });
+
+  test('lastRunning tracks the running instance', async () => {
+    const t = task(async () => {
+      await timeout(50);
+      return 'ok';
+    });
+
+    expect(t.lastRunning).toBeNull();
+    const instance = t.perform();
+    expect(t.lastRunning).toBe(instance);
+    await instance;
+    expect(t.lastRunning).toBe(instance);
+  });
+
+  test('lastComplete tracks completed and errored instances', async () => {
+    const t = task(async (n: number) => {
+      await timeout(10);
+      if (n === 0) throw new Error('fail');
+      return n;
+    });
+
+    expect(t.lastComplete).toBeNull();
+
+    const errInstance = t.perform(0);
+    await expectRejects(errInstance);
+    expect(t.lastComplete).toBe(errInstance);
+
+    const okInstance = t.perform(1);
+    await okInstance;
+    expect(t.lastComplete).toBe(okInstance);
+  });
+
+  test('lastIncomplete tracks the running instance', async () => {
+    const t = task(async () => {
+      await timeout(50);
+      return 'ok';
+    });
+
+    expect(t.lastIncomplete).toBeNull();
+    const instance = t.perform();
+    expect(t.lastIncomplete).toBe(instance);
+    await instance;
+    expect(t.lastIncomplete).toBe(instance);
+  });
+
+  test('isQueued and queued state', async () => {
+    const t = task(async () => {
+      await timeout(50);
+    }).enqueue();
+
+    expect(t.isQueued).toBe(false);
+    expect(t.state).toBe('idle');
+
+    const a = t.perform();
+    expect(t.isQueued).toBe(false);
+    expect(t.state).toBe('running');
+
+    const b = t.perform();
+    expect(t.isQueued).toBe(true);
+    expect(t.state).toBe('running');
+
+    await a;
+    await b;
+    expect(t.isQueued).toBe(false);
+    expect(t.state).toBe('idle');
   });
 });
 
@@ -320,6 +429,61 @@ describe('cancelAll', () => {
     expect(a.isCanceled).toBe(true);
     expect(b.isCanceled).toBe(true);
   });
+
+  test('cancels all running and queued instances', async () => {
+    const t = task(async () => {
+      await timeout(50);
+    }).enqueue();
+
+    const a = t.perform();
+    const b = t.perform();
+    const c = t.perform();
+    await new Promise((r) => setTimeout(r, 10));
+    t.cancelAll();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(a.isCanceled).toBe(true);
+    expect(b.isCanceled).toBe(true);
+    expect(c.isCanceled).toBe(true);
+    expect(t.isIdle).toBe(true);
+  });
+
+  test('perform after cancelAll starts fresh', async () => {
+    const t = task(async () => {
+      return 'ok';
+    });
+
+    t.perform();
+    t.cancelAll();
+    await new Promise((r) => setTimeout(r, 0));
+    const instance = t.perform();
+    const result = await instance;
+    expect(result).toBe('ok');
+  });
+});
+
+describe('Task PromiseLike', () => {
+  test('then() resolves with last performed value', async () => {
+    const t = task(async () => 42);
+    t.perform();
+    const result = await t;
+    expect(result).toBe(42);
+  });
+
+  test('then() rejects when task was never performed', async () => {
+    const t = task(async () => 42);
+    await expectRejects(t.then(), 'Task has never been performed');
+  });
+
+  test('catch() works on Task', async () => {
+    let err: unknown = undefined;
+    const t = task(async () => {
+      throw new Error('task-error');
+    });
+    t.perform();
+    await t.catch((e) => { err = e; });
+    expect((err as Error).message).toBe('task-error');
+  });
 });
 
 describe('onState callback', () => {
@@ -374,6 +538,80 @@ describe('Task with options', () => {
     expect(first.isCanceled).toBe(true);
     expect(second.isRunning).toBe(true);
   });
+
+  test('constructor with drop option', async () => {
+    let count = 0;
+    const t = task(async () => {
+      count++;
+      await timeout(50);
+    }, { drop: true });
+
+    const a = t.perform();
+    const b = t.perform();
+    await timeout(100);
+    expect(count).toBe(1);
+    expect(b.isCanceled).toBe(true);
+  });
+
+  test('constructor with enqueue option', async () => {
+    const order: string[] = [];
+    const t = task(async (id: string) => {
+      order.push(`start-${id}`);
+      await timeout(30);
+      order.push(`end-${id}`);
+    }, { enqueue: true });
+
+    await Promise.all([t.perform('a'), t.perform('b')]);
+    expect(order).toEqual(['start-a', 'end-a', 'start-b', 'end-b']);
+  });
+
+  test('constructor with keepLatest option', async () => {
+    const t = task(async (v: string) => {
+      await timeout(50);
+      return v;
+    }, { keepLatest: true });
+
+    const a = t.perform('a');
+    await timeout(5);
+    const b = t.perform('b');
+    await timeout(100);
+    expect(b.isSuccessful).toBe(true);
+  });
+
+  test('constructor with maxConcurrency only', async () => {
+    let current = 0;
+    let max = 0;
+    const t = task(async (id: number) => {
+      current++;
+      await timeout(30);
+      max = Math.max(max, current);
+      await timeout(30);
+      current--;
+      return id;
+    }, { maxConcurrency: 2 });
+
+    const instances = await Promise.all([t.perform(1), t.perform(2), t.perform(3)]);
+    expect(instances).toEqual([1, 2, 3]);
+    expect(max).toBe(2);
+  });
+
+  test('constructor with restartable and maxConcurrency', async () => {
+    let count = 0;
+    const t = task(async () => {
+      count++;
+      await timeout(50);
+    }, { restartable: true, maxConcurrency: 2 });
+
+    const a = t.perform();
+    const b = t.perform();
+    await timeout(10);
+    const c = t.perform();
+    await timeout(100);
+    expect(a.isCanceled || a.isSuccessful).toBe(true);
+    expect(b.isCanceled || b.isSuccessful).toBe(true);
+    expect(c.isSuccessful).toBe(true);
+    expect(count).toBeLessThanOrEqual(3);
+  });
 });
 
 describe('timeout helper', () => {
@@ -393,6 +631,21 @@ describe('timeout helper', () => {
     const instance = t.perform();
     t.cancelAll();
     await expectRejects(instance, TaskCancelation);
+  });
+
+  test('rejects immediately when signal is already aborted', async () => {
+    const t = task(async () => {
+      const self = getCurrentTaskInstance();
+      self.cancel();
+      try {
+        await timeout(10);
+      } catch {
+        // expected — signal already aborted
+      }
+    });
+    const instance = t.perform();
+    await expectRejects(instance, TaskCancelation);
+    expect(instance.isCanceled).toBe(true);
   });
 });
 
@@ -415,6 +668,25 @@ describe('all helper', () => {
 
     await expectRejects(t.perform(), 'nope');
   });
+
+  test('rejects immediately when signal is already aborted', async () => {
+    const t = task(async () => {
+      const self = getCurrentTaskInstance();
+      self.cancel();
+      try {
+        await all([Promise.resolve(1)]);
+      } catch {
+        // expected — signal already aborted
+      }
+    });
+    const instance = t.perform();
+    await expectRejects(instance, TaskCancelation);
+  });
+
+  test('works outside a task context', async () => {
+    const result = await all([Promise.resolve(1), Promise.resolve(2)]);
+    expect(result).toEqual([1, 2]);
+  });
 });
 
 describe('race helper', () => {
@@ -429,6 +701,36 @@ describe('race helper', () => {
 
     const result = await t.perform();
     expect(result).toBe('fast');
+  });
+
+  test('rejects when the first settled promise rejects', async () => {
+    const t = task(async () => {
+      await race([
+        Promise.reject(new Error('first-reject')),
+        timeout(50).then(() => 'slow'),
+      ]);
+    });
+
+    await expectRejects(t.perform(), 'first-reject');
+  });
+
+  test('rejects immediately when signal is already aborted', async () => {
+    const t = task(async () => {
+      const self = getCurrentTaskInstance();
+      self.cancel();
+      try {
+        await race([Promise.resolve(1)]);
+      } catch {
+        // expected — signal already aborted
+      }
+    });
+    const instance = t.perform();
+    await expectRejects(instance, TaskCancelation);
+  });
+
+  test('works outside a task context', async () => {
+    const result = await race([Promise.resolve(1), Promise.resolve(2)]);
+    expect(result).toBe(1);
   });
 });
 
