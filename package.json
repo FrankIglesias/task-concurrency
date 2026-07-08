@@ -1,0 +1,32 @@
+{
+  "name": "task-concurrency",
+  "version": "0.1.0",
+  "description": "Pure TypeScript library emulating Ember Concurrency tasks",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "prepublishOnly": "bun run build"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "typescript": "^5.7.0"
+  }
+}
