@@ -1,6 +1,8 @@
 import { describe, test, expect } from 'bun:test';
 
 import { getCurrentTaskInstance } from '../src/context.ts';
+import { Scheduler } from '../src/scheduler/scheduler.ts';
+import { UnboundedSchedulerPolicy } from '../src/scheduler/unbounded-policy.ts';
 import {
   task,
   timeout,
@@ -484,6 +486,14 @@ describe('Task PromiseLike', () => {
     await t.catch((e) => { err = e; });
     expect((err as Error).message).toBe('task-error');
   });
+
+  test('finally() runs on Task', async () => {
+    let called = false;
+    const t = task(async () => 42);
+    t.perform();
+    await t.finally(() => { called = true; });
+    expect(called).toBe(true);
+  });
 });
 
 describe('onState callback', () => {
@@ -597,6 +607,17 @@ describe('all helper', () => {
     const result = await all([Promise.resolve(1), Promise.resolve(2)]);
     expect(result).toEqual([1, 2]);
   });
+
+  test('cancel during all() rejects with TaskCancelation', async () => {
+    const t = task(async () => {
+      await all([new Promise(() => {})]);
+    });
+
+    const instance = t.perform();
+    await timeout(10);
+    instance.cancel();
+    await expectRejects(instance, TaskCancelation);
+  });
 });
 
 describe('race helper', () => {
@@ -642,6 +663,17 @@ describe('race helper', () => {
     const result = await race([Promise.resolve(1), Promise.resolve(2)]);
     expect(result).toBe(1);
   });
+
+  test('cancel during race() rejects with TaskCancelation', async () => {
+    const t = task(async () => {
+      await race([new Promise(() => {}), new Promise(() => {})]);
+    });
+
+    const instance = t.perform();
+    await timeout(10);
+    instance.cancel();
+    await expectRejects(instance, TaskCancelation);
+  });
 });
 
 describe('maxConcurrency', () => {
@@ -681,5 +713,13 @@ describe('Chaining modifier methods', () => {
     const instances = await Promise.all([t.perform(1), t.perform(2), t.perform(3), t.perform(4)]);
     expect(instances).toEqual([1, 2, 3, 4]);
     expect(max).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('Scheduler internals', () => {
+  test('running and queued getters', async () => {
+    const scheduler = new Scheduler(new UnboundedSchedulerPolicy());
+    expect(scheduler.running).toEqual([]);
+    expect(scheduler.queued).toEqual([]);
   });
 });
