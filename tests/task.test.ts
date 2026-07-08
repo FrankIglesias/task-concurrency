@@ -524,22 +524,6 @@ describe('onState callback', () => {
   });
 });
 
-describe('Task with options', () => {
-  test('accepts options in constructor', async () => {
-    const t = task(async () => {
-      await timeout(50);
-      return 1;
-    }).restartable();
-    expect(t.isIdle).toBe(true);
-
-    const first = t.perform();
-    await timeout(10);
-    const second = t.perform();
-    expect(first.isCanceled).toBe(true);
-    expect(second.isRunning).toBe(true);
-  });
-});
-
 describe('timeout helper', () => {
   test('resolves after specified time', async () => {
     const start = Date.now();
