@@ -1,6 +1,14 @@
 import { popCurrentTaskInstance, setCurrentTaskInstance } from "@/context";
 import { isTaskCancelation, TaskCancelation } from "@/task-cancelation";
 
+export const TaskInstanceStateValues = {
+	Waiting: "waiting",
+	Running: "running",
+	Completed: "completed",
+	Errored: "errored",
+	Canceled: "canceled",
+} as const;
+
 export type TaskInstanceState =
 	| "waiting"
 	| "running"

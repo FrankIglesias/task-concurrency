@@ -4,5 +4,6 @@ export { timeout } from "@/helpers/timeout";
 export type { OnStateCallback, TaskDerivedState } from "@/task";
 export { Task, task } from "@/task";
 export { isTaskCancelation, TaskCancelation } from "@/task-cancelation";
+export { TaskInstanceStateValues } from "@/task-instance";
 export type { TaskInstanceLike, TaskInstanceState } from "@/task-instance";
 export { TaskInstance } from "@/task-instance";
