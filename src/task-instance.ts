@@ -8,9 +8,10 @@ export type TaskInstanceState =
 	| "errored"
 	| "canceled";
 
-const CANCELED = Symbol("canceled");
-
-type WrapResult<T> = { ok: true; value: T } | { ok: false; error: unknown };
+type WrapResult<T> =
+	| { status: "ok"; value: T }
+	| { status: "error"; error: unknown }
+	| { status: "canceled" };
 
 export interface TaskInstanceLike {
 	readonly signal: AbortSignal;
@@ -128,9 +129,9 @@ export class TaskInstance<T = unknown>
 
 			const wrapResult = await this._wrapPromise(this._fn(...this._args));
 
-			if (wrapResult === CANCELED) {
+			if (wrapResult.status === "canceled") {
 				this._fail(new TaskCancelation());
-			} else if (!wrapResult.ok) {
+			} else if (wrapResult.status === "error") {
 				this._fail(wrapResult.error);
 			} else {
 				this._settle(wrapResult.value);
@@ -142,13 +143,13 @@ export class TaskInstance<T = unknown>
 
 	private _wrapPromise<T>(
 		promise: Promise<T>,
-	): Promise<WrapResult<T> | typeof CANCELED> {
+	): Promise<WrapResult<T>> {
 		if (this._abortController.signal.aborted) {
-			return Promise.resolve(CANCELED);
+			return Promise.resolve({ status: "canceled" });
 		}
 
-		return new Promise<WrapResult<T> | typeof CANCELED>((resolve) => {
-			const onAbort = () => resolve(CANCELED);
+		return new Promise<WrapResult<T>>((resolve) => {
+			const onAbort = () => resolve({ status: "canceled" });
 
 			this._abortController.signal.addEventListener("abort", onAbort, {
 				once: true,
@@ -157,11 +158,11 @@ export class TaskInstance<T = unknown>
 			promise.then(
 				(val) => {
 					this._abortController.signal.removeEventListener("abort", onAbort);
-					resolve({ ok: true, value: val });
+					resolve({ status: "ok", value: val });
 				},
 				(err) => {
 					this._abortController.signal.removeEventListener("abort", onAbort);
-					resolve({ ok: false, error: err });
+					resolve({ status: "error", error: err });
 				},
 			);
 		});
