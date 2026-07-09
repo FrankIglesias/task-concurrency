@@ -191,6 +191,8 @@ t.lastCanceled
 
 ## onState Callback
 
+The callback fires immediately on registration with the current state, then on every transition.
+
 ```ts
 task(async () => { ... }).onState((state) => {
   console.log(state.isRunning, state.isIdle);
