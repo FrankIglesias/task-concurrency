@@ -10,11 +10,7 @@ export const TaskInstanceStateValues = {
 } as const;
 
 export type TaskInstanceState =
-	| "waiting"
-	| "running"
-	| "completed"
-	| "errored"
-	| "canceled";
+	(typeof TaskInstanceStateValues)[keyof typeof TaskInstanceStateValues];
 
 type WrapResult<T> =
 	| { status: "ok"; value: T }
@@ -149,9 +145,7 @@ export class TaskInstance<T = unknown>
 		}
 	}
 
-	private _wrapPromise<T>(
-		promise: Promise<T>,
-	): Promise<WrapResult<T>> {
+	private _wrapPromise<T>(promise: Promise<T>): Promise<WrapResult<T>> {
 		if (this._abortController.signal.aborted) {
 			return Promise.resolve({ status: "canceled" });
 		}
