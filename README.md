@@ -11,7 +11,7 @@ bun add task-concurrency
 ## Quick Start
 
 ```ts
-import { task, timeout } from "task-concurrency";
+import { task } from "task-concurrency";
 
 const fetchUser = task(async (id: number) => {
   const res = await fetch(`/users/${id}`);
