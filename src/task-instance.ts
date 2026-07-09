@@ -1,4 +1,4 @@
-import { popCurrentTaskInstance, setCurrentTaskInstance } from "@/context";
+import { runAsTaskInstance } from "@/context";
 import { isTaskCancelation, TaskCancelation } from "@/task-cancelation";
 
 export const TaskInstanceStateValues = {
@@ -126,9 +126,7 @@ export class TaskInstance<T = unknown>
 	}
 
 	private async _execute(): Promise<void> {
-		setCurrentTaskInstance(this);
-
-		try {
+		await runAsTaskInstance(this, async () => {
 			this._setState("running");
 
 			const wrapResult = await this._wrapPromise(this._fn(...this._args));
@@ -140,9 +138,7 @@ export class TaskInstance<T = unknown>
 			} else {
 				this._settle(wrapResult.value);
 			}
-		} finally {
-			popCurrentTaskInstance(this);
-		}
+		});
 	}
 
 	private _wrapPromise<T>(promise: Promise<T>): Promise<WrapResult<T>> {

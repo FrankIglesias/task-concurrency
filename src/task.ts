@@ -5,24 +5,24 @@ import { RestartableSchedulerPolicy } from "@/scheduler/restartable-policy";
 import { Scheduler, type SchedulerDelegate } from "@/scheduler/scheduler";
 import type { SchedulerPolicy } from "@/scheduler/types";
 import { UnboundedSchedulerPolicy } from "@/scheduler/unbounded-policy";
-import { TaskInstance } from "@/task-instance";
+import { TaskInstance, type TaskInstanceState } from "@/task-instance";
 
-export type OnStateCallback = (state: TaskDerivedState) => void;
+export type OnStateCallback<T = unknown> = (state: TaskDerivedState<T>) => void;
 
-export interface TaskDerivedState {
+export interface TaskDerivedState<T = unknown> {
 	isRunning: boolean;
 	isIdle: boolean;
 	isQueued: boolean;
 	state: "idle" | "running" | "queued";
 	performCount: number;
-	last: TaskInstance<unknown> | null;
-	lastSuccessful: TaskInstance<unknown> | null;
-	lastErrored: TaskInstance<unknown> | null;
-	lastCanceled: TaskInstance<unknown> | null;
-	lastPerformed: TaskInstance<unknown> | null;
-	lastRunning: TaskInstance<unknown> | null;
-	lastComplete: TaskInstance<unknown> | null;
-	lastIncomplete: TaskInstance<unknown> | null;
+	last: TaskInstance<T> | null;
+	lastSuccessful: TaskInstance<T> | null;
+	lastErrored: TaskInstance<T> | null;
+	lastCanceled: TaskInstance<T> | null;
+	lastPerformed: TaskInstance<T> | null;
+	lastRunning: TaskInstance<T> | null;
+	lastComplete: TaskInstance<T> | null;
+	lastIncomplete: TaskInstance<T> | null;
 }
 
 type PolicyConstructor = new (
@@ -48,11 +48,9 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 	private _lastCanceled: TaskInstance<T> | null = null;
 	private _lastIncomplete: TaskInstance<T> | null = null;
 
-	private _onStateCallback: OnStateCallback | null = null;
+	private _onStateCallback: OnStateCallback<T> | null = null;
 
-	constructor(
-		private _fn: (...args: Args) => Promise<T>,
-	) {}
+	constructor(private _fn: (...args: Args) => Promise<T>) {}
 
 	private _rebuildScheduler(): void {
 		const policy = new this._policyCtor(this._maxConcurrency);
@@ -149,7 +147,7 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 
 	private _onInstanceStateChanged(
 		instance: TaskInstance<T>,
-		state: string,
+		state: TaskInstanceState,
 	): void {
 		if (state === "running") {
 			this._lastRunning = instance;
@@ -208,7 +206,7 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 		return this;
 	}
 
-	onState(callback: OnStateCallback | null): this {
+	onState(callback: OnStateCallback<T> | null): this {
 		this._onStateCallback = callback;
 		if (callback) {
 			callback(this._collectState());
@@ -222,21 +220,21 @@ export class Task<T = unknown, Args extends unknown[] = unknown[]>
 		}
 	}
 
-	private _collectState(): TaskDerivedState {
+	private _collectState(): TaskDerivedState<T> {
 		return {
 			isRunning: this.isRunning,
 			isIdle: this.isIdle,
 			isQueued: this.isQueued,
 			state: this.state,
 			performCount: this._performCount,
-			last: this._last as TaskInstance<unknown> | null,
-			lastSuccessful: this._lastSuccessful as TaskInstance<unknown> | null,
-			lastErrored: this._lastErrored as TaskInstance<unknown> | null,
-			lastCanceled: this._lastCanceled as TaskInstance<unknown> | null,
-			lastPerformed: this._lastPerformed as TaskInstance<unknown> | null,
-			lastRunning: this._lastRunning as TaskInstance<unknown> | null,
-			lastComplete: this._lastComplete as TaskInstance<unknown> | null,
-			lastIncomplete: this._lastIncomplete as TaskInstance<unknown> | null,
+			last: this._last,
+			lastSuccessful: this._lastSuccessful,
+			lastErrored: this._lastErrored,
+			lastCanceled: this._lastCanceled,
+			lastPerformed: this._lastPerformed,
+			lastRunning: this._lastRunning,
+			lastComplete: this._lastComplete,
+			lastIncomplete: this._lastIncomplete,
 		};
 	}
 
@@ -273,5 +271,3 @@ export function task<T, Args extends unknown[]>(
 ): Task<T, Args> {
 	return new Task<T, Args>(fn);
 }
-
-

@@ -1,22 +1,15 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { TaskInstanceLike } from "@/task-instance";
 
-const contextStack: Array<TaskInstanceLike | null> = [];
-
-export function setCurrentTaskInstance(
-	instance: TaskInstanceLike | null,
-): void {
-	contextStack.push(instance);
-}
+const taskStorage = new AsyncLocalStorage<TaskInstanceLike | null>();
 
 export function getCurrentTaskInstance(): TaskInstanceLike | null {
-	return contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
+	return taskStorage.getStore() ?? null;
 }
 
-export function popCurrentTaskInstance(
+export function runAsTaskInstance<T>(
 	instance: TaskInstanceLike | null,
-): void {
-	const idx = contextStack.lastIndexOf(instance);
-	if (idx !== -1) {
-		contextStack.splice(idx, 1);
-	}
+	fn: () => T,
+): T {
+	return taskStorage.run(instance, fn);
 }
